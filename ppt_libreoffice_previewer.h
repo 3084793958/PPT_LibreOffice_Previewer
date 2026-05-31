@@ -5,6 +5,9 @@
 
 #include <QProcess>
 
+#include <QFutureWatcher>
+#include <QtConcurrent/QtConcurrent>
+
 class PPT_LibreOffice_Previewer : public QObject, public Ext_Preview_PluginInterface//插件接口
 {
     Q_OBJECT
@@ -26,13 +29,22 @@ public:
     virtual QString Plugin_Name() override;//插件名
     virtual void init(Preview_File_Interface *ptr, QWidget *carrier) override;//初始化函数,给出对应指针,方便方法调用
     virtual void clear() override;//清理由插件产生的预览的函数
-    virtual bool previewFile(QFileInfo &info) override;//预览文件函数,需要返回一个bool,告诉Easy_Desktop自己能否预览
+    virtual bool previewFile(QFileInfo &info) override;//预览文件函数,需要返回一个bool,告诉Easy_Desktop自己能否预览,但这里需要异步处理.先返回true,交给异步处理
+    virtual bool willThrowFileToNextPreview() override;//因异步,先交给别的插件处理.若异步加载成功,就clearCurrentPreview(),然后setPdf()
 private:
     Preview_File_Interface *preview_file_ptr = nullptr;//预览控件的指针
-    QProcess *m_process = new QProcess(this);//调用libreoffice转化ppt到pdf
+    void Ppt_To_Pdf(QFileInfo &info);//转化函数
+
+    QProcess *m_process = new QProcess(this);
+    //调用libreoffice转化ppt到pdf
     //不知道什么原因,在QtCreator中无法正常启动libreoffice
 
-    QPair<bool, QFileInfo> Ppt_To_Pdf(QFileInfo &info);//转化函数<是否成功,转化后的文件路径>
+    bool is_math = false;//odt公式文件特殊处理
+
+private:
+    QFutureWatcher<QPair<bool, QFileInfo>> *watcher = new QFutureWatcher<QPair<bool, QFileInfo>>(this);//异步操作
+private:
+    P_Version plugin_version{0, 0, 2};//标记插件版本
 };
 
 #endif // PPT_LIBREOFFICE_PREVIEWER_H
